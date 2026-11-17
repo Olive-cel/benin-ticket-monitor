@@ -4,10 +4,21 @@ name: Surveillance billets Benin
 on:
   schedule:
     - cron: "2-59/5 * * * *"
+
   workflow_dispatch:
+    inputs:
+      test_email:
+        description: "Envoyer un email de test"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+  issues: write
+
+concurrency:
+  group: benin-ticket-monitor
+  cancel-in-progress: false
 
 jobs:
   surveillance:
@@ -26,5 +37,19 @@ jobs:
       - name: Installer les dependances
         run: pip install requests beautifulsoup4
 
-      - name: Verifier voyage.benin.bj
+      - name: Tester Gmail
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_email }}
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: python monitor.py --test-email
+
+      - name: Surveiller le site
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.test_email }}
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GH_TOKEN: ${{ github.token }}
         run: python monitor.py
